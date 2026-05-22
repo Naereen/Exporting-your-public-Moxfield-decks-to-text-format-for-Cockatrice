@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exportateur Moxfield vers Cockatrice</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        /* Quelques ajustements personnalisés si besoin */
+        body { font-family: system-ui, -apple-system, sans-serif; }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white rounded-xl shadow-lg p-8 max-w-lg w-full">
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">Moxfield Auto-Exporter</h1>
+        <p class="text-gray-600 mb-6 text-sm">
+            Cette application récupère tous les <strong>decks publics</strong> d'un utilisateur Moxfield et les compile dans une archive ZIP contenant des fichiers au format Cockatrice (.txt).
+        </p>
+
+        <div class="space-y-4">
+            <div>
+                <label for="username" class="block text-sm font-medium text-gray-700">Nom d'utilisateur Moxfield</label>
+                <input type="text" id="username" placeholder="ex: Naereen" 
+                    class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+
+            <button id="exportBtn" onclick="startExport()" 
+                class="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                Lancer l'exportation
+            </button>
+        </div>
+
+        <div id="statusArea" class="mt-6 hidden">
+            <div class="flex items-center space-x-3 mb-2">
+                <div id="spinner" class="loader hidden"></div>
+                <span id="statusText" class="text-sm font-semibold text-gray-700">Initialisation...</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <div id="logArea" class="bg-gray-50 p-3 rounded text-xs text-gray-500 h-32 overflow-y-auto font-mono whitespace-pre-wrap border border-gray-200"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "https://api.moxfield.com/v2";
+
+        // Fonction utilitaire pour simuler le time.sleep() de Python
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        // Fonction pour ajouter des logs dans l'interface
+        function logMessage(msg, isError = false) {
+            const logArea = document.getElementById('logArea');
+            const statusText = document.getElementById('statusText');
+            
+            const span = document.createElement('span');
+            span.textContent = msg + '\n';
+            if (isError) span.className = "text-red-600 font-bold";
+            
+            logArea.appendChild(span);
+            logArea.scrollTop = logArea.scrollHeight; // Auto-scroll
+            
+            if (!msg.startsWith('[-]')) {
+                statusText.textContent = msg;
+            }
+        }
+
+        // Met à jour la barre de progression
+        function updateProgress(current, total) {
+            const bar = document.getElementById('progressBar');
+            const percentage = total === 0 ? 0 : Math.round((current / total) * 100);
+            bar.style.width = percentage + '%';
+        }
+
+        // Formater les données du deck au format Cockatrice (exactement comme le script Python)
+        function formatToTxt(deckData) {
+            let lines = [];
+            
+            // Mainboard
+            const mainboard = deckData.mainboard || {};
+            for (const [name, info] of Object.entries(mainboard)) {
+                lines.push(`${info.quantity || 1} ${name}`);
+            }
+
+            // Sideboard
+            const sideboard = deckData.sideboard || {};
+            for (const [name, info] of Object.entries(sideboard)) {
+                lines.push(`SB: ${info.quantity || 1} ${name}`);
+            }
+
+            // Commanders (ajoutés au sideboard s'ils n'y sont pas déjà)
+            const commanders = deckData.commanders || {};
+            for (const [name, info] of Object.entries(commanders)) {
+                if (!sideboard[name]) {
+                    lines.push(`SB: ${info.quantity || 1} ${name}`);
+                }
+            }
+
+            return lines.join('\n');
+        }
+
+        // Nettoyer le nom du fichier pour éviter les caractères invalides sous Windows/Linux
+        function sanitizeFilename(name) {
+            return name.replace(/[<>:"/\\|?*]+/g, '').trim() || 'Untitled';
+        }
+
+        async function fetchAllDecks(username) {
+            let decks = [];
+            let page = 1;
+            let totalPages = 1;
+
+            while (page <= totalPages) {
+                logMessage(`Récupération de la page ${page}...`);
+                try {
+                    const response = await fetch(`${API_URL}/users/${username}/decks?pageNumber=${page}&pageSize=50`);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Erreur HTTP: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    const pageData = data.data || [];
+                    
+                    if (pageData.length === 0) break;
+                    
+                    decks = decks.concat(pageData);
+                    totalPages = data.totalPages || 1;
+                    page++;
+                    
+                    // Respect des limites de l'API (Rate Limiting)
+                    await sleep(500);
+                } catch (error) {
+                    logMessage(`Erreur lors de la récupération des decks: ${error.message}`, true);
+                    break;
+                }
+            }
+            return decks;
+        }
+
+        async function startExport() {
+            const usernameInput = document.getElementById('username').value.trim();
+            if (!usernameInput) {
+                alert("Veuillez entrer un nom d'utilisateur.");
+                return;
+            }
+
+            // Préparation de l'UI
+            document.getElementById('statusArea').classList.remove('hidden');
+            document.getElementById('spinner').classList.remove('hidden');
+            document.getElementById('exportBtn').disabled = true;
+            document.getElementById('exportBtn').classList.add('opacity-50', 'cursor-not-allowed');
+            document.getElementById('logArea').innerHTML = '';
+            updateProgress(0, 1);
+
+            const zip = new JSZip();
+            const folder = zip.folder(`Moxfield_Backups_${usernameInput}`);
+
+            logMessage(`Démarrage de la recherche pour l'utilisateur: ${usernameInput}`);
+
+            // 1. Récupérer la liste des decks
+            const decks = await fetchAllDecks(usernameInput);
+            const totalDecks = decks.length;
+
+            if (totalDecks === 0) {
+                logMessage("Aucun deck public trouvé pour cet utilisateur.", true);
+                resetUI();
+                return;
+            }
+
+            logMessage(`Total des decks trouvés : ${totalDecks}`);
+
+            // 2. Parcourir chaque deck pour récupérer les cartes
+            for (let i = 0; i < totalDecks; i++) {
+                const deck = decks[i];
+                const publicId = deck.publicId;
+                const safeName = sanitizeFilename(deck.name);
+                
+                logMessage(`[-] Téléchargement: ${safeName} (${i+1}/${totalDecks})`);
+                updateProgress(i + 1, totalDecks);
+
+                try {
+                    const response = await fetch(`${API_URL}/decks/all/${publicId}`);
+                    if (response.ok) {
+                        const deckDetails = await response.json();
+                        const txtContent = formatToTxt(deckDetails);
+                        // Ajout du fichier au zip
+                        folder.file(`${safeName}.txt`, txtContent);
+                    } else {
+                        logMessage(`Erreur pour le deck ${safeName} (Code ${response.status})`, true);
+                    }
+                } catch (error) {
+                    logMessage(`Exception pour le deck ${safeName}: ${error.message}`, true);
+                }
+
+                // Délai crucial pour ne pas se faire bloquer par l'API (429 Too Many Requests)
+                await sleep(400); 
+            }
+
+            logMessage("Génération de l'archive ZIP en cours...");
+
+            // 3. Générer et télécharger le fichier ZIP
+            try {
+                const blob = await zip.generateAsync({ type: "blob" });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.style.display = "none";
+                a.href = url;
+                a.download = `Moxfield_Backups_${usernameInput}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                logMessage("✅ Exportation terminée avec succès ! Le téléchargement a démarré.");
+                document.getElementById('statusText').textContent = "Terminé !";
+            } catch (error) {
+                logMessage(`Erreur lors de la création du ZIP: ${error.message}`, true);
+            }
+
+            resetUI();
+        }
+
+        function resetUI() {
+            document.getElementById('spinner').classList.add('hidden');
+            document.getElementById('exportBtn').disabled = false;
+            document.getElementById('exportBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    </script>
+</body>
+</html>
