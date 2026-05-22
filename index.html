@@ -57,10 +57,15 @@
     </div>
 
     <script>
-        // API de Moxfield.com, version basique (échoue à cause du CORS)
-        // const API_URL = "https://api.moxfield.com/v2";
-        // On préfixe l'URL de l'API par un proxy CORS public
-        const API_URL = "https://corsproxy.io/?url=https://api.moxfield.com/v2";
+        // API de Moxfield.com
+        const API_URL = "https://api.moxfield.com/v2";
+        // Proxy CORS public utilisé pour contourner les restrictions CORS du navigateur
+        const CORS_PROXY = "https://corsproxy.io/?url=";
+
+        // Enveloppe une URL d'API dans le proxy CORS en encodant correctement l'URL cible
+        function proxiedUrl(apiUrl) {
+            return CORS_PROXY + encodeURIComponent(apiUrl);
+        }
 
         // Fonction utilitaire pour simuler le time.sleep() de Python
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -129,7 +134,7 @@
             while (page <= totalPages) {
                 logMessage(`Récupération de la page ${page}...`);
                 try {
-                    const response = await fetch(`${API_URL}/users/${username}/decks?pageNumber=${page}&pageSize=50`);
+                    const response = await fetch(proxiedUrl(`${API_URL}/users/${username}/decks?pageNumber=${page}&pageSize=50`));
                     
                     if (!response.ok) {
                         throw new Error(`Erreur HTTP: ${response.status}`);
@@ -196,7 +201,7 @@
                 updateProgress(i + 1, totalDecks);
 
                 try {
-                    const response = await fetch(`${API_URL}/decks/all/${publicId}`);
+                    const response = await fetch(proxiedUrl(`${API_URL}/decks/all/${publicId}`));
                     if (response.ok) {
                         const deckDetails = await response.json();
                         const txtContent = formatToTxt(deckDetails);
