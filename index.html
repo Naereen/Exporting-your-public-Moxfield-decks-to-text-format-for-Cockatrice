@@ -178,11 +178,6 @@
             return decks;
         }
 
-        // ... (dans la fonction startExport, au moment de boucler sur les détails du deck)
-        // Remplacez la ligne du fetch de détails par celle-ci :
-        const detailTarget = getProxyUrl(`https://api.moxfield.com/v2/decks/all/${publicId}`);
-        const response = await fetch(detailTarget);
-
         async function startExport() {
             const usernameInput = document.getElementById('username').value.trim();
             if (!usernameInput) {
