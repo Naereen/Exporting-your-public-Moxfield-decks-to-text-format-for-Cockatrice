@@ -57,7 +57,10 @@
     </div>
 
     <script>
-        const API_URL = "https://api.moxfield.com/v2";
+        // API de Moxfield.com, version basique (échoue à cause du CORS)
+        // const API_URL = "https://api.moxfield.com/v2";
+        // On préfixe l'URL de l'API par un proxy CORS public
+        const API_URL = "https://corsproxy.io/?https://api.moxfield.com/v2";
 
         // Fonction utilitaire pour simuler le time.sleep() de Python
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
