@@ -1,6 +1,10 @@
-# Exportateur Moxfield → Cockatrice
+# Exportateur Moxfield → Cockatrice (expérience ratée !)
 
 > Exporte tous les decks publics d'un utilisateur [Moxfield](https://www.moxfield.com/) en fichiers texte compatibles avec [Cockatrice](https://cockatrice.github.io/).
+
+Cela n'a pas fonctionné.
+
+----
 
 ## 🎯 Fonctionnalités
 

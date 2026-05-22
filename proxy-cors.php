@@ -29,7 +29,7 @@ if ($action === 'list') {
         ob_end_flush();
         exit;
     }
-    $targetUrl = "https://api.moxfield.com/v2/users/{$username}/decks?pageNumber={$page}&pageSize=50";
+    $targetUrl = "https://api.moxfield.com/v2/users/{$username}/decks?pageNumber={$page}&pageSize=100";
 
 } elseif ($action === 'detail') {
     // Construction de l'URL de détail de manière interne et sûre
