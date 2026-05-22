@@ -1,0 +1,21 @@
+# Système d'exploitation
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Éditeurs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Fichiers générés / téléchargés
+*.zip
+*.log
+
+# Dépendances Node.js (si jamais utilisées)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
