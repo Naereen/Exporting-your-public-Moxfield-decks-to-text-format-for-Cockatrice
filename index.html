@@ -57,10 +57,12 @@
     </div>
 
     <script>
-        // API de Moxfield.com
+        // 1) API de Moxfield.com
         const API_URL = "https://api.moxfield.com/v2";
-        // Proxy CORS public utilisé pour contourner les restrictions CORS du navigateur
+        // 2) Proxy CORS public utilisé pour contourner les restrictions CORS du navigateur
         const CORS_PROXY = "https://corsproxy.io/?url=";
+        // 3) Utilisation de AllOrigins en mode "raw" pour contourner CORS
+        const ALL_ORIGINS_PROXY = "https://api.allorigins.win/raw?url=";
 
         // Enveloppe une URL d'API dans le proxy CORS en encodant correctement l'URL cible
         function proxiedUrl(apiUrl) {
