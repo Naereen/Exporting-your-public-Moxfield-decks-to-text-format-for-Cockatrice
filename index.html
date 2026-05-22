@@ -58,7 +58,7 @@
 
     <script>
         // 1) API de Moxfield.com
-        const API_URL = "https://api.moxfield.com/v2";
+        const BASE_API_URL = "https://api.moxfield.com/v2";
 
         // 2) Proxy CORS public utilisé pour contourner les restrictions CORS du navigateur
         const CORS_PROXY = "https://corsproxy.io/?url=";
@@ -72,6 +72,17 @@
         // Enveloppe une URL d'API dans le proxy CORS en encodant correctement l'URL cible
         function proxiedUrl(apiUrl) {
             return ALL_ORIGINS_PROXY + encodeURIComponent(apiUrl);
+        }
+
+        // 4) Indiquez ici l'URL absolue où se trouve votre fichier proxy.php
+        const PROXY_URL = "https://perso.crans.org/besson/publis/Exporting-your-public-Moxfield-decks-to-text-format-for-Cockatrice/proxy-cors.php?url=";
+
+        // L'API_URL va désormais encapsuler les appels Moxfield dans notre proxy
+        const API_URL = PROXY_URL + encodeURIComponent("https://api.moxfield.com/v2");
+
+        // Fonction utilitaire révisée pour gérer l'encapsulation dynamique lors de la pagination ou du détail
+        function getProxyUrl(targetMoxfieldUrl) {
+            return PROXY_URL + encodeURIComponent(targetMoxfieldUrl);
         }
 
         // Fonction utilitaire pour simuler le time.sleep() de Python
@@ -141,7 +152,9 @@
             while (page <= totalPages) {
                 logMessage(`Récupération de la page ${page}...`);
                 try {
-                    const response = await fetch(proxiedUrl(`${API_URL}/users/${username}/decks?pageNumber=${page}&pageSize=50`));
+                    // Utilisation du proxy pour la liste des decks
+                    const target = `${API_URL}/users/${username}/decks?pageNumber=${page}&pageSize=50`;
+                    const response = await fetch(target);
                     
                     if (!response.ok) {
                         throw new Error(`Erreur HTTP: ${response.status}`);
@@ -156,8 +169,7 @@
                     totalPages = data.totalPages || 1;
                     page++;
                     
-                    // Respect des limites de l'API (Rate Limiting)
-                    await sleep(500);
+                    await sleep(500); // Protection contre le flood
                 } catch (error) {
                     logMessage(`Erreur lors de la récupération des decks: ${error.message}`, true);
                     break;
@@ -165,6 +177,11 @@
             }
             return decks;
         }
+
+        // ... (dans la fonction startExport, au moment de boucler sur les détails du deck)
+        // Remplacez la ligne du fetch de détails par celle-ci :
+        const detailTarget = getProxyUrl(`https://api.moxfield.com/v2/decks/all/${publicId}`);
+        const response = await fetch(detailTarget);
 
         async function startExport() {
             const usernameInput = document.getElementById('username').value.trim();
@@ -208,7 +225,12 @@
                 updateProgress(i + 1, totalDecks);
 
                 try {
-                    const response = await fetch(proxiedUrl(`${API_URL}/decks/all/${publicId}`));
+                    // const response = await fetch(proxiedUrl(`${API_URL}/decks/all/${publicId}`));
+                    // ... (dans la fonction startExport, au moment de boucler sur les détails du deck)
+                    // Remplacez la ligne du fetch de détails par celle-ci :
+                    const detailTarget = getProxyUrl(`https://api.moxfield.com/v2/decks/all/${publicId}`);
+                    const response = await fetch(detailTarget);
+
                     if (response.ok) {
                         const deckDetails = await response.json();
                         const txtContent = formatToTxt(deckDetails);
